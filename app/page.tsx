@@ -16,7 +16,6 @@ type Message = {
   latency?: number;
 };
 
-const socket = new WebSocket("ws://localhost:8080");
 
 export default function Home() {
   const [input, setInput] = useState("");

@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { unstable_after as after } from "next/server";
+import { Message } from "@/types/conversation";
 
 const groq = new Groq();
 
@@ -17,6 +18,12 @@ const schema = zfd.formData({
 		)
 	),
 });
+
+async function generateResponse(messages: Message[]) {
+	
+
+}
+
 
 export async function POST(request: Request) {
 	// console.time("transcribe " + request.headers.get("x-vercel-id") || "local");
