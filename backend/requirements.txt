@@ -6,3 +6,14 @@ alembic
 pydantic
 aioredis
 python-dotenv 
+dependency_injector
+lancedb
+llama_index
+tiktoken
+unstructured
+chromadb
+llama-index-vector-stores-chroma
+"unstructured[docx]"
+python-magic-bin==0.4.14
+tantivy
+pydantic-settings

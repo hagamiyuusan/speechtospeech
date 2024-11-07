@@ -9,6 +9,7 @@
 		"lint": "next lint"
 	},
 	"dependencies": {
+		"@cartesia/cartesia-js": "^1.2.1",
 		"@picovoice/porcupine-react": "^3.0.3",
 		"@picovoice/web-voice-processor": "^4.0.9",
 		"@radix-ui/react-dialog": "^1.1.2",
@@ -38,7 +39,8 @@
 		"tailwindcss-animate": "^1.0.7",
 		"uuid": "^11.0.2",
 		"zod": "^3.23.8",
-		"zod-form-data": "^2.0.2"
+		"zod-form-data": "^2.0.2",
+		"zustand": "^5.0.1"
 	},
 	"devDependencies": {
 		"@types/node": "^20",

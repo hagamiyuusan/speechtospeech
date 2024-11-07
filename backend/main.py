@@ -5,17 +5,23 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from models import Conversation, Base
-from schemas import ChatRequest, ConversationBase, ConversationCreate, ConversationResponse, Message, ConversationResponse
-from database import get_db, engine
+from schemas import ChatRequest, ConversationBase,  Message
 from cache import get_conversation_cache, set_conversation_cache
 import uvicorn
 from typing import List
 from uuid import UUID
-from datetime import datetime
 from utils import generateTitle, generate_response_chunks
+from fastapi.middleware.cors import CORSMiddleware
+from app.containers import Container
+
+
 app = FastAPI()
 
-from fastapi.middleware.cors import CORSMiddleware
+container = Container()
+container.config.from_yaml('config.yaml')
+container.wire(modules=[__name__])
+
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,10 +31,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Create database tables
-@app.on_event("startup")
-async def on_startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+
+async def get_conversation(id: UUID, db: AsyncSession = Depends(co)):
+    result = await db.execute(select(Conversation).where(Conversation.id == id))
+    convo = result.scalars().first()
+    return convo
+
+
 
 async def create_conversation(conversation_id: UUID, title: str, messages: List[dict], db: AsyncSession):
     # Ensure messages are list of dicts
@@ -46,37 +55,37 @@ async def create_conversation(conversation_id: UUID, title: str, messages: List[
     await db.refresh(new_convo)
     return new_convo  # Return the Conversation object
 
-@app.post("/conversations/{conversation_id}/messages/", response_model=Message)
-async def add_message(conversation_id: UUID, message: Message, db: AsyncSession = Depends(get_db)):
-    # Check if conversation exists
-    result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
-    convo = result.scalars().first()
-    if not convo:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+# @app.post("/conversations/{conversation_id}/messages/", response_model=Message)
+# async def add_message(conversation_id: UUID, message: Message, db: AsyncSession = Depends(get_db)):
+#     # Check if conversation exists
+#     result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+#     convo = result.scalars().first()
+#     if not convo:
+#         raise HTTPException(status_code=404, detail="Conversation not found")
     
-    if message.role not in ['user', 'assistant']:
-        raise HTTPException(status_code=400, detail="Invalid role")
+#     if message.role not in ['user', 'assistant']:
+#         raise HTTPException(status_code=400, detail="Invalid role")
 
-    # Append the new message with timestamp
-    new_message = {
-        "role": message.role,
-        "content": message.content,
-    }
+#     # Append the new message with timestamp
+#     new_message = {
+#         "role": message.role,
+#         "content": message.content,
+#     }
 
-    convo.messages.append(new_message)
-    db.add(convo)
-    await db.commit()
-    await db.refresh(convo)
+#     convo.messages.append(new_message)
+#     db.add(convo)
+#     await db.commit()
+#     await db.refresh(convo)
     
-    message_response = Message(
-        role=new_message["role"],
-        content=new_message["content"],
-    )
+#     message_response = Message(
+#         role=new_message["role"],
+#         content=new_message["content"],
+#     )
     
-    # Invalidate cache for this conversation
-    await set_conversation_cache(str(conversation_id), "null")
+#     # Invalidate cache for this conversation
+#     await set_conversation_cache(str(conversation_id), "null")
     
-    return message_response
+#     return message_response
 
 
 @app.post("/chat")
@@ -111,7 +120,6 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     async def process_messages():
         # Convert messages from dicts to Message models
         messages = [Message(**msg) for msg in convo.messages]
-        print("Before generating response", messages)
         response_generator = generate_response_chunks(messages)
 
         async for chunk in response_generator:
@@ -124,7 +132,6 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
                 }
                 # Append the assistant's response to the conversation
                 convo.messages.append(assistant_message)
-                print("After generating response", convo.messages)
                 db.add(convo)
                 await db.commit()
                 await db.refresh(convo)
@@ -135,14 +142,14 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
 
     return StreamingResponse(process_messages(), media_type="text/event-stream")
 
-
+# get conversation by id
 @app.get("/conversation/{conversation_id}")
 async def load_conversation(conversation_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
     convo = result.scalars().first()
     return convo
 
-
+# get all conversations
 @app.get("/conversations/", response_model=List[ConversationBase])
 async def list_conversations(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Conversation))
@@ -151,6 +158,8 @@ async def list_conversations(db: AsyncSession = Depends(get_db)):
         id=str(convo.id),
         title=convo.title,
     ) for convo in convos]
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -3,7 +3,6 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { unstable_after as after } from "next/server";
-import { Message } from "@/types/conversation";
 
 const groq = new Groq();
 
@@ -19,10 +18,6 @@ const schema = zfd.formData({
 	),
 });
 
-async function generateResponse(messages: Message[]) {
-	
-
-}
 
 
 export async function POST(request: Request) {
@@ -44,23 +39,6 @@ export async function POST(request: Request) {
 	});
 }
 
-function location() {
-	const headersList = headers();
-
-	const country = headersList.get("x-vercel-ip-country");
-	const region = headersList.get("x-vercel-ip-country-region");
-	const city = headersList.get("x-vercel-ip-city");
-
-	if (!country || !region || !city) return "unknown";
-
-	return `${city}, ${region}, ${country}`;
-}
-
-function time() {
-	return new Date().toLocaleString("en-US", {
-		timeZone: headers().get("x-vercel-ip-timezone") || undefined,
-	});
-}
 
 async function getTranscript(input: string | File) {
 	if (typeof input === "string") return input;

@@ -9,3 +9,8 @@ export type Message = {
     title: string;
     messages: Message[];
   };
+
+export type shortDescription = {
+  id: string;
+  title: string;
+}

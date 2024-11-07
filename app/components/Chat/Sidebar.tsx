@@ -1,66 +1,50 @@
 // components/Chat/Sidebar.tsx
 import React, { useEffect, useState } from 'react';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Loader2 } from 'lucide-react';
 import ConversationItem from './ConversationItem';
 import Button from '../UI/Button';
+import { shortDescription } from '@/types/conversation';
 
-interface ConversationID {
-  id: string;
-  title: string;
-}
 
 interface SidebarProps {
-  conversationIDs: ConversationID[];
   selectedId: string;
   onSelect: (id: string) => void;
   onBackToCreateNewChat: () => void;
+  conversations: shortDescription[];
+  isLoading: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ conversationIDs, selectedId, onSelect, onBackToCreateNewChat }) => {
-  const [conversations, setConversations] = useState<ConversationID[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const Sidebar: React.FC<SidebarProps> = ({ selectedId,
+  onSelect,
+  onBackToCreateNewChat,
+  conversations,
+  isLoading }) => {
   
-  // useEffect(() => {
-  //   const fetchConversations = async () => {
-  //     try {
-  //       const response = await fetch('http://localhost:8000/conversations/', {
-  //         method: 'GET',
-  //         headers: {
-  //           'Content-Type': 'application/json',
-  //         },
-  //         credentials: 'include'
-  //       });
-  //       if (!response.ok) throw new Error('Failed to fetch conversations');
-  //       const data = await response.json();
-  //       setConversations(data);
-  //     } catch (error) {
-  //       console.error('Error fetching conversations:', error);
-  //     } finally {
-  //       setIsLoading(false);
-  //     }
-  //   };
-  
-  //   fetchConversations();
-  // }, []);
   return (
-  <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
-      <div className="p-5 border-b border-gray-200">
+    <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col h-screen">
+      <div className="p-5 border-b border-gray-200 flex-shrink-0">
         <Button onClick={onBackToCreateNewChat} className="w-full flex items-center justify-center gap-2">
           <PlusIcon size={18} />
           New Chat
-      </Button>
-    </div>
-    <nav className="flex-1 overflow-y-auto p-2" role="navigation">
-      <div className="space-y-1">
-        {conversationIDs.map((conv) => (
-          <ConversationItem
-            key={conv.id}
-            shortDescription={conv.title}
-            isActive={selectedId === conv.id}
-            onClick={() => onSelect(conv.id)}
-          />
-        ))}
-        </div>
+        </Button>
+      </div>
+      <nav className="flex-1 overflow-y-auto p-2 scrollbar-none" role="navigation">
+        {isLoading ? (
+          <div className="flex justify-center items-center h-20">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          </div>
+        ) : (
+          <div className="space-y-1">
+            {conversations.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                shortDescription={conv.title}
+                isActive={selectedId === conv.id}
+                onClick={() => onSelect(conv.id)}
+              />
+            ))}
+          </div>
+        )}
       </nav>
     </aside>
   );

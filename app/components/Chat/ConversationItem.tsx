@@ -24,8 +24,13 @@ const ConversationItem: React.FC<ConversationItemProps> = ({ shortDescription, i
     aria-pressed={isActive}
   >
     <div className="flex items-center gap-2">
-      <MessageCircleIcon size={18} className={isActive ? 'text-blue-500' : 'text-gray-500'} />
-      <span className="text-sm truncate">{shortDescription}</span>
+      <div className="flex-shrink-0"> {/* Added flex-shrink-0 to prevent icon from shrinking */}
+        <MessageCircleIcon 
+          size={18} 
+          className={isActive ? 'text-blue-500' : 'text-gray-500'} 
+        />
+      </div>
+      <span className="text-sm truncate flex-1 text-left">{shortDescription}</span> {/* Added flex-1 and text-left */}
     </div>
   </button>
 );
