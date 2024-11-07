@@ -6,7 +6,8 @@ import TextArea from '../UI/TextArea';
 import { Message, shortDescription } from '@/types/conversation';
 import { v4 as uuidv4 } from 'uuid';
 import ReactMarkdown from 'react-markdown';
-
+import RecordButton from '../UI/RecordButton';
+import clsx from 'clsx';
 interface ChatPanelProps {
   conversationID: string | null;
   initialMessage: string;
@@ -25,27 +26,53 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ conversationID, initialMessage, u
   const [title, setTitle] = useState("New Chat");
   const [streamedContent, setStreamedContent] = useState('');
   const initialMessageSentRef = useRef(false);
+  const [isRecording, setIsRecording] = useState(false);
   const playTextToSpeech = useCallback(async (text: string) => {
     try {
-      console.log("text", text);
       const response = await fetch('http://localhost:8000/tts', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        
         body: JSON.stringify({ text }),
       });
-
+  
       if (!response.ok) throw new Error('TTS request failed');
-
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
+  
+      // Create a MediaSource instance
+      const mediaSource = new MediaSource();
+      const audio = new Audio();
+      audio.src = URL.createObjectURL(mediaSource);
+  
+      mediaSource.addEventListener('sourceopen', async () => {
+        const sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg');
+        const reader = response.body?.getReader();
+        
+        if (!reader) throw new Error('No response body');
+  
+        // Read and append chunks to the sourceBuffer
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          // Wait for the previous append to complete
+          if (!sourceBuffer.updating) {
+            sourceBuffer.appendBuffer(value);
+          }
+        }
+  
+        // Close the media source when done
+        if (!sourceBuffer.updating) {
+          mediaSource.endOfStream();
+        }
+      });
+  
+      // Play the audio
       await audio.play();
-
+  
+      // Cleanup
       audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
+        URL.revokeObjectURL(audio.src);
       };
     } catch (error) {
       console.error('Error playing TTS:', error);
@@ -183,6 +210,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ conversationID, initialMessage, u
 
 
   return (
+    <>
+      <div
+        className={clsx(
+          "absolute size-36 blur-3xl rounded-full bg-gradient-to-b from-red-200 to-red-400 dark:from-red-600 dark:to-red-800 -z-50 transition ease-in-out",
+          {
+            "opacity-0": isRecording,
+            "opacity-30": !isRecording,
+            "opacity-100 scale-110": isRecording,
+          }
+        )}
+      />
     <main className="flex-1 flex flex-col h-screen h-screen-padded">
       <header className="border-b border-gray-200 p-5 flex-shrink-0">
       <div className="flex items-center justify-between">
@@ -247,23 +285,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ conversationID, initialMessage, u
     </div>
 
     <footer className="border-t border-gray-200 p-4 flex-shrink-0">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2">
-          <TextArea 
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={isSending}
-          />
-          <IconButton icon={<SendIcon size={20} className="text-blue-600" />}
-           aria-label="Send message"
-           onClick={() => handleSend(input)}
-           disabled={isSending}
-           />
-        </div>
-      </div>
-    </footer>
+  <div className="max-w-4xl mx-auto">
+    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-2">
+      <TextArea 
+        placeholder="Type your message or press and hold to record..."
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        disabled={isSending}
+      />
+      <RecordButton 
+        onTranscription={(text) => {
+          setInput(text);
+          handleSend(text);
+        }}
+        onRecordingComplete={() => {}}
+        onRecording={setIsRecording}
+      />
+      <IconButton 
+        icon={<SendIcon size={20} className="text-blue-600" />}
+        aria-label="Send message"
+        onClick={() => handleSend(input)}
+        disabled={isSending}
+      />
+    </div>
+  </div>
+  </footer>
   </main>
+  </>
   );
 };
 

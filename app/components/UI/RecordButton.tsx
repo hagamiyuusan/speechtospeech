@@ -1,46 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Mic } from 'lucide-react';
-import { useMicVAD, utils } from "@ricky0123/vad-react";
 import { toast } from "sonner";
 
 interface RecordButtonProps {
   onTranscription: (text: string) => void;
   onRecordingComplete?: () => void;
+  onRecording?: (isRecording: boolean) => void;
 }
 
-const RecordButton: React.FC<RecordButtonProps> = ({ onTranscription, onRecordingComplete }) => {
+const RecordButton: React.FC<RecordButtonProps> = ({ onTranscription, onRecordingComplete, onRecording }) => {
   const [isRecording, setIsRecording] = useState(false);
-
-  const vad = useMicVAD({
-    startOnLoad: true,
-    onSpeechEnd: async (audio) => {
-      const wav = utils.encodeWAV(audio);
-      const blob = new Blob([wav], { type: "audio/wav" });
-      await getTranscription(blob);
-
-      const isFirefox = navigator.userAgent.includes("Firefox");
-      if (isFirefox) vad.pause();
-    },
-    workletURL: "/vad.worklet.bundle.min.js",
-    modelURL: "/silero_vad.onnx",
-    positiveSpeechThreshold: 0.6,
-    minSpeechFrames: 4,
-    ortConfig(ort) {
-      const isSafari = /^((?!chrome|android).)*safari/i.test(
-        navigator.userAgent
-      );
-
-      ort.env.wasm = {
-        wasmPaths: {
-          "ort-wasm-simd-threaded.wasm": "/ort-wasm-simd-threaded.wasm",
-          "ort-wasm-simd.wasm": "/ort-wasm-simd.wasm",
-          "ort-wasm.wasm": "/ort-wasm.wasm",
-          "ort-wasm-threaded.wasm": "/ort-wasm-threaded.wasm",
-        },
-        numThreads: isSafari ? 1 : 4,
-      };
-    },
-  });
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const getTranscription = async (blob: Blob) => {
     const formData = new FormData();
@@ -69,14 +40,43 @@ const RecordButton: React.FC<RecordButtonProps> = ({ onTranscription, onRecordin
     }
   };
 
-  const startRecording = () => {
-    setIsRecording(true);
-    vad.start();
+  const startRecording = async () => {
+    onRecording?.(true);
+    console.log("start recording")
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      toast.error("Could not access microphone");
+    }
   };
 
   const stopRecording = () => {
+    onRecording?.(false);
+    if (!mediaRecorderRef.current) return;
+
+    mediaRecorderRef.current.onstop = async () => {
+      const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+      await getTranscription(audioBlob);
+      
+      // Stop all tracks in the stream
+      mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+    };
+
+    mediaRecorderRef.current.stop();
     setIsRecording(false);
-    vad.pause();
   };
 
   return (
@@ -94,8 +94,6 @@ const RecordButton: React.FC<RecordButtonProps> = ({ onTranscription, onRecordin
     >
       <Mic size={40} />
     </button>
-    
-    
   );
 };
 

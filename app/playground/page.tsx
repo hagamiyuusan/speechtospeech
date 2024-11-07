@@ -61,7 +61,7 @@ const ChatInterface: React.FC = () => {
 
 
   const updateListConversation = (conversation: shortDescription) => {
-    setConversations(prev => [...prev, conversation]);
+    setConversations(prev => [ conversation, ...prev,]);
     setSelectedId(conversation.id);
   };
 

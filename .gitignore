@@ -37,4 +37,6 @@ next-env.d.ts
 
 # files copied from npm modules
 public/
+backend/app/.env
+backend/config.yaml
 backend/.env
