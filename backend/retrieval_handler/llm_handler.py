@@ -10,11 +10,11 @@ class LLMHandler(BaseLLM):
         self.model_name = model_name
         print(self.model_name)
 
-    async def generate_response(self, messages: list[dict] | str, tools: list = None, function_map : dict = None, model_name: str = "gpt-4o"):
+    async def generate_response(self, messages: list[dict] | str, tools: list = None, function_map : dict = None, model_name: str = None):
         user_messages = messages.copy()
         if tools and function_map:
             response = await self.client.chat.completions.create(
-                model=self.model_name,
+                model= model_name if model_name else self.model_name,
                 messages=user_messages,
                 temperature=0.7,
                 tools=tools,
@@ -40,17 +40,17 @@ class LLMHandler(BaseLLM):
 
         else:
             response = await self.client.chat.completions.create(
-                model=self.model_name,
+                model=model_name if model_name else self.model_name,
                 messages=user_messages,
                 temperature=0.7)
             return response.choices[0].message.content
     
 
-    async def stream_response(self, messages: list[dict] | str, tools: list = None, function_map: dict = None):
+    async def stream_response(self, messages: list[dict] | str, tools: list = None, function_map: dict = None, model_name: str = None):
         user_messages = messages.copy()
         if tools and function_map:
             response = await self.client.chat.completions.create(
-                model=self.model_name,
+                model=model_name if model_name else self.model_name,
                 messages=user_messages,
                 temperature=0.7,
                 tools=tools,

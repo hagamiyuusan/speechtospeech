@@ -37,7 +37,7 @@ class RAGHandler(IRAGHandler):
         rag_template = []
         rag_template.append({"role": "system", "content": SYSTEM_PROMPT_RAG})
         rag_template.append({"role": "user", "content": USER_PROMPT_RAG.format(context=evidence, question=query)})
-        return await self.llm.generate_response(messages=rag_template, model_name="gpt-4o-mini")
+        return await self.llm.generate_response(messages=rag_template, model_name="gpt-4o")
 
         
     

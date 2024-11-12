@@ -1,15 +1,3 @@
-# from sqlalchemy import Column, String, Integer, JSON
-# from .database import Base
-
-# class ChatLog(Base):
-#     """
-#     SQLAlchemy model for storing chat logs.
-#     """
-#     __tablename__ = "chatlogs"
-
-#     id = Column(Integer, primary_key=True, index=True)
-#     user_id = Column(String, unique=True, index=True, nullable=False)
-#     history = Column(JSON, nullable=False)
 
 from sqlalchemy import Column, String, Text, DateTime, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB

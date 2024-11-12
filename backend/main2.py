@@ -21,9 +21,7 @@ container.wire(modules=[__name__])
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000",
-                   "https://b431-171-243-224-241.ngrok-free.app",
-                   "https://*.ngrok-free.app",],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,11 +87,7 @@ async def text_to_speech(request: dict):
         media_type="audio/mpeg",
         headers={
             "Accept-Ranges": "bytes",
-            "Content-Type": "audio/mpeg",
-            "Access-Control-Allow-Origin": "https://b431-171-243-224-241.ngrok-free.app",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type"
+            "Content-Type": "audio/mpeg"
         }
     )
 if __name__ == "__main__":

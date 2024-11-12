@@ -1,23 +1,29 @@
 # app/services.py
 import json
 from typing import List, Dict, Optional
-import aioredis
+from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from .models import Conversation
 from .schema import ConversationBase, Message
 from uuid import UUID, uuid4
 from datetime import datetime
-from .utils import generateTitle
 from agent.main_agent import MainAgent
-
+from retrieval_handler.llm_handler import LLMHandler
 
 class ChatService:
-    def __init__(self, redis_url: str, session: AsyncSession, agent: MainAgent):
+    def __init__(self, redis_url: str, session: AsyncSession, agent: MainAgent, llm_handler: LLMHandler):
         print(redis_url)
         self.redis = aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
         self.session = session
         self.agent = agent
+        self.llm_handler = llm_handler
+
+    async def generate_title(self, content: str):
+        messages = [
+            {"role": "user", "content": f"Generate a title for the conversation with the following content: {content}"}
+        ]
+        return await self.llm_handler.generate_response(messages)
 
     async def list_conversations(self) -> List[Dict]:
         query = select(Conversation).order_by(Conversation.modified_at.desc())
@@ -54,7 +60,7 @@ class ChatService:
         try:
             # Update database
             if is_new_conversation:
-                title = await generateTitle(new_message['content'])
+                title = await self.generate_title(new_message['content'])
                 db_convo = Conversation(
                     id=id,
                     title=title,

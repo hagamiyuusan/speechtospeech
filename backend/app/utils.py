@@ -29,21 +29,21 @@
 #     container.config.kafka.topic_responses.from_env("KAFKA_TOPIC_RESPONSES")
 #     return container
 
-from openai import AsyncOpenAI
-import os
-from dotenv import load_dotenv
+# from openai import AsyncOpenAI
+# import os
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
-client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-async def generateTitle(messages: str):
-    messages = [{"role": "user", "content":
-                f"Generate a title for this conversation, this is first message: {messages}"}]
-    response = await client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=messages,
-        temperature=0.5
-    )
-    return response.choices[0].message.content
+# async def generateTitle(messages: str):
+#     messages = [{"role": "user", "content":
+#                 f"Generate a title for this conversation, this is first message: {messages}"}]
+#     response = await client.chat.completions.create(
+#         model="gpt-4o-mini",
+#         messages=messages,
+#         temperature=0.5
+#     )
+#     return response.choices[0].message.content
 

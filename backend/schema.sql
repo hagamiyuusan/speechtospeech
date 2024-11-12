@@ -1,11 +1,30 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION
+IF NOT EXISTS "uuid-ossp";
 
--- Table to store conversations with messages as JSONB
-CREATE TABLE IF NOT EXISTS conversations (
+CREATE TABLE conversations
+(
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     title VARCHAR(255) NOT NULL,
-    messages JSONB DEFAULT '[]'::jsonb
+    messages JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMP
+    WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    modified_at TIMESTAMP
+    WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Index to speed up queries by conversation_id
-CREATE INDEX IF NOT EXISTS idx_conversations_id ON conversations(id);
+    -- Create a trigger to automatically update modified_at
+    CREATE OR REPLACE FUNCTION update_modified_column
+    ()
+RETURNS TRIGGER AS $$
+    BEGIN
+    NEW.modified_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+    END;
+$$ language 'plpgsql';
+
+    CREATE TRIGGER update_conversations_modified_at
+    BEFORE
+    UPDATE ON conversations
+    FOR EACH ROW
+    EXECUTE FUNCTION update_modified_column
+    ();

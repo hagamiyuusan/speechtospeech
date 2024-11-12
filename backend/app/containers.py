@@ -75,7 +75,8 @@ class Container(containers.DeclarativeContainer):
         ChatService,
         redis_url=config.redis.url,
         session=db_session,
-        agent=main_agent
+        agent=main_agent,
+        llm_handler=llm
     )
     openai_client = providers.Singleton(
         AsyncOpenAI,
