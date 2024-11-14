@@ -9,8 +9,7 @@ from uuid import UUID
 import uvicorn
 from dependency_injector.wiring import inject
 import json
-import pyaudio
-from fastapi import UploadFile, WebSocket, File, Form
+from fastapi import UploadFile, File, Form
 app = FastAPI()
 
 
