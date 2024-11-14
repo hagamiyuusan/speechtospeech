@@ -14,7 +14,6 @@ unstructured
 chromadb
 llama-index-vector-stores-chroma
 #"unstructured[docx]"
-python-magic-bin
 tantivy
 pydantic-settings
 groq

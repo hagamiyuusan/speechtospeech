@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     libpq-dev \
     portaudio19-dev \
+    libmagic-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
