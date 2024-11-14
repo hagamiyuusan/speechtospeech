@@ -4,7 +4,7 @@ asyncpg
 sqlalchemy[asyncio]
 alembic
 pydantic
-aioredis
+redis
 python-dotenv 
 dependency_injector
 lancedb
