@@ -40,3 +40,6 @@ public/
 backend/app/.env
 backend/config.yaml
 backend/.env
+backend/audio/*
+backend/output_audio/*
+backend/*.mp3

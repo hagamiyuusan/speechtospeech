@@ -15,10 +15,10 @@ const RecordButton: React.FC<RecordButtonProps> = ({ onTranscription, onRecordin
 
   const getTranscription = async (blob: Blob) => {
     const formData = new FormData();
-    formData.append("input", blob, "audio.wav");
+    formData.append("input", blob, "audio.mp3");
 
     try {
-      const response = await fetch("/api", {
+      const response = await fetch("/api/voice", {
         method: "POST",
         body: formData,
       });

@@ -4,7 +4,9 @@ project_root = Path().resolve()
 sys.path.append(str(project_root / 'base'))
 sys.path.append(str(project_root / 'retrieval_handler'))
 sys.path.append(str(project_root / 'agent'))
+sys.path.append(str(project_root / 'voice'))
 
+from voice import STT
 from dependency_injector import containers, providers
 from retrieval_handler.docstore_handler import DocumentStoreHandler
 from retrieval_handler.vectorstore_handler import VectorStoreHandler
@@ -52,6 +54,10 @@ class Container(containers.DeclarativeContainer):
     )
     reader = providers.Singleton(
         UnstructuredReader
+    )
+    stt = providers.Singleton(
+        STT,
+        api_key=config.llm.groq_api_key
     )
     retriever = providers.Singleton(
         HybridRetriever,

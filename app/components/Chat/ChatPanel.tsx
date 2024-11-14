@@ -42,6 +42,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         URL.revokeObjectURL(currentAudioRef.current.src);
         currentAudioRef.current = null;
       }
+  
       const response = await fetch("http://localhost:8000/tts", {
         method: "POST",
         headers: {
@@ -49,50 +50,46 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         },
         body: JSON.stringify({ text }),
       });
-
+  
       if (!response.ok) throw new Error("TTS request failed");
-
-      // Create a MediaSource instance
-      const mediaSource = new MediaSource();
+  
+      // Get the audio data as ArrayBuffer
+      const audioData = await response.arrayBuffer();
+      
+      // Create an audio element with the blob URL
+      const blob = new Blob([audioData], { type: 'audio/mp3' });
       const audio = new Audio();
-      audio.src = URL.createObjectURL(mediaSource);
+      audio.src = URL.createObjectURL(blob);
+      
       currentAudioRef.current = audio;
-      mediaSource.addEventListener("sourceopen", async () => {
-        const sourceBuffer = mediaSource.addSourceBuffer("audio/mpeg");
-        const reader = response.body?.getReader();
-
-        if (!reader) throw new Error("No response body");
-
-        // Read and append chunks to the sourceBuffer
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          // Wait for the previous append to complete
-          if (!sourceBuffer.updating) {
-            sourceBuffer.appendBuffer(value);
-          }
-        }
-
-        // Close the media source when done
-        if (!sourceBuffer.updating) {
-          mediaSource.endOfStream();
-        }
-      });
-
-      // Play the audio
-      await audio.play();
-
-      // Cleanup
+  
+      // Add event listeners
       audio.onended = () => {
         URL.revokeObjectURL(audio.src);
+        currentAudioRef.current = null;
       };
+  
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e);
+        URL.revokeObjectURL(audio.src);
+        currentAudioRef.current = null;
+      };
+  
+      // Play the audio
+      try {
+        await audio.play();
+      } catch (playError) {
+        console.error('Playback failed:', playError);
+        throw playError;
+      }
+  
     } catch (error) {
       console.error("Error playing TTS:", error);
     }
   }, []);
-
-  const stopCurrentAudio = useCallback(() => {
+  
+  // Add this utility function to stop audio
+  const stopAudio = useCallback(() => {
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
       URL.revokeObjectURL(currentAudioRef.current.src);
@@ -186,6 +183,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           message: userMessage,
         }),
       });
+      console.log("response", response);
 
       if (!response.body) throw new Error("No response body");
 
@@ -343,7 +341,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 onRecording={(recording) => {
                   setIsRecording(recording);
                   if (recording) {
-                    stopCurrentAudio();
+                    stopAudio();
                   }
                 }}
               />

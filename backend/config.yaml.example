@@ -1,0 +1,21 @@
+database:
+  url: 
+
+redis:
+  url: 
+
+embedder:
+  api_key: 
+  model_name: gpt-4o
+llm:
+  api_key: 
+  model_name: 
+  groq_api_key: 
+
+document_store:
+  uri: ./docstore
+  table_name: asian_docstore
+
+vector_store:
+  path: ./vectorstore
+  collection_name: asian_vectorstore

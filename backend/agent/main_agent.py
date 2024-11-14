@@ -57,12 +57,12 @@ class MainAgent:
                 content=self.system_prompt
             ))
         messages_dicts = [{"role": message.role, "content": message.content} for message in message_objects]
-
         return self.llm_handler.stream_response(
             messages=messages_dicts,
             tools=self.tools,
-            function_map=self.agent_functions
+            function_map=self.agent_functions,
         )
+
 
 
 

@@ -7,5 +7,5 @@ class BaseLLM(ABC):
         pass
     
     @abstractmethod
-    def generate_response_stream(self, messages: list[dict] | str, tools: list = None, function_map : dict = None) -> str:
+    def stream_response(self, messages: list[dict] | str, tools: list = None, function_map : dict = None) -> str:
         pass

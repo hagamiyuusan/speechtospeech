@@ -123,9 +123,11 @@ class ChatService:
             is_new_conversation=True
         )
         return db_convo
+    
+    async def chat_response_without_stream(self, id: UUID, message: Message):
+        return await self.chat_response(id, message, stream=False)
 
-
-    async def stream_response(self, id: UUID, message: Message):
+    async def chat_response(self, id: UUID, message: Message):
         try:
             convo = await self.load_conversation(id)
             message_dict = {
@@ -145,16 +147,15 @@ class ChatService:
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save message: {str(e)}"}) + "\n"
                 return
+            response_id = str(uuid4())
 
-            # Generate and stream response
+  
+                # Generate and stream response
             response_stream = await self.agent.response(messages_list)
             full_response = ""
             async for chunk in response_stream:
                 full_response += chunk
                 yield json.dumps({"content": chunk}) + "\n"
-
-            # Send final response
-            response_id = str(uuid4())
             yield json.dumps({
                 "id": response_id,
                 "full_response": full_response
@@ -173,9 +174,7 @@ class ChatService:
                 )
             except Exception as e:
                 yield json.dumps({"error": f"Failed to save response: {str(e)}"}) + "\n"
-
-            # Send completion signal
-            yield json.dumps({"done": True}) + "\n"
+                yield json.dumps({"done": True}) + "\n"
 
         except Exception as e:
             print(f"Stream response error: {str(e)}")
