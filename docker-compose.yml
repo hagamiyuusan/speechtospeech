@@ -34,7 +34,7 @@ services:
       - ./backend:/app
       - ./backend/config.yaml:/app/config.yaml
     ports:
-      - "8000:8001"  # Only expose backend port
+      - "8001:8000"  # Only expose backend port
     depends_on:
       db:
         condition: service_healthy
