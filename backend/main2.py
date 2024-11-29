@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from app.containers import Container
 from app.services import ChatService
@@ -66,6 +66,17 @@ async def create_audio_stream(text: str):
     # p.terminate()
 
 
+@inject 
+async def create_audio_from_text(text: str):
+    client = container.openai_client()
+    response = await client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text,
+            response_format="mp3"
+    )
+    return response.content
+
 @app.post("/chat")
 @inject
 async def chat(
@@ -123,6 +134,47 @@ async def audio_to_audio(audio_file: UploadFile = File(...), conversation_id: st
         }
     )
 
+@app.post("/audio-to-audio-complete")
+@inject
+async def audio_to_audio_complete(
+    audio_file: UploadFile = File(...), 
+    conversation_id: str = Form(...), 
+    stt_service = Depends(get_stt_service), 
+    chat_service: ChatService = Depends(get_chat_service)
+):
+    conversation_id = UUID(conversation_id)
+    # Get transcript from STT service
+    transcript = await stt_service.generate_audio(audio_file)
+    
+    # Create a proper Message object
+    from app.schema import Message
+    from uuid import uuid4
+    message = Message(id=str(uuid4()), role="user", content=transcript)
+    
+    text_response = ""
+    # Get complete text response
+    async for chunk in chat_service.chat_response(conversation_id, message):
+        json_chunk = json.loads(chunk)
+        if "full_response" in json_chunk:
+            text_response += json_chunk["full_response"]
+    
+    if not text_response:
+        raise HTTPException(status_code=500, detail="No response generated")
+
+    # Collect all audio chunks into a single bytes object
+    audio_chunks = []
+    async for chunk in create_audio_stream(text_response):
+        audio_chunks.append(chunk)
+    
+    complete_audio = b''.join(audio_chunks)
+    
+    return Response(
+        content=complete_audio,
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "attachment; filename=response.mp3"
+        }
+    )
 
 
 
