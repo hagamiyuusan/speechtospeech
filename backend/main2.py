@@ -239,16 +239,14 @@ async def chat_to_audio(
         raise HTTPException(status_code=500, detail="No response generated")
     
     # Create the audio stream
-    async def stream_response():
-        async for chunk in create_audio_stream(text_response):
-            yield chunk
+    response = await create_audio_from_text_without_streaming(text_response)
     
-    return StreamingResponse(
-        stream_response(),
-        media_type="audio/mpeg",
+    return Response(
+        content=response,
+        media_type="audio/wav",
         headers={
             "Accept-Ranges": "bytes",
-            "Content-Type": "audio/mpeg"
+            "Content-Type": "audio/wav"
         }
     )
 
