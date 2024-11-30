@@ -56,7 +56,7 @@ async def create_audio_stream(text: str):
             model="tts-1",
             voice="alloy",
             input=text,
-            response_format="mp3"
+            response_format ="wav"
     ) as response:
         async for chunk in response.iter_bytes(1024):
             # stream.write(chunk)
@@ -67,13 +67,13 @@ async def create_audio_stream(text: str):
 
 
 @inject 
-async def create_audio_from_text(text: str):
+async def create_audio_from_text_without_streaming(text: str):
     client = container.openai_client()
     response = await client.audio.speech.create(
             model="tts-1",
             voice="alloy",
             input=text,
-            response_format="mp3"
+            response_format="wav"
     )
     return response.content
 
@@ -127,16 +127,17 @@ async def audio_to_audio(audio_file: UploadFile = File(...), conversation_id: st
             yield chunk
     return StreamingResponse(
         stream_response(),
-        media_type="audio/mpeg",
+        media_type="audio/wav",
         headers={
             "Accept-Ranges": "bytes",
-            "Content-Type": "audio/mpeg"
+            "Content-Type": "audio/wav"
         }
     )
 
-@app.post("/audio-to-audio-complete")
+
+@app.post("/audio-to-audio-full")
 @inject
-async def audio_to_audio_complete(
+async def audio_to_audio_full(
     audio_file: UploadFile = File(...), 
     conversation_id: str = Form(...), 
     stt_service = Depends(get_stt_service), 
@@ -161,20 +162,58 @@ async def audio_to_audio_complete(
     if not text_response:
         raise HTTPException(status_code=500, detail="No response generated")
 
-    # Collect all audio chunks into a single bytes object
-    audio_chunks = []
-    async for chunk in create_audio_stream(text_response):
-        audio_chunks.append(chunk)
-    
-    complete_audio = b''.join(audio_chunks)
+    # Use create_audio_from_text instead of collecting chunks
+    audio_content = await create_audio_from_text_without_streaming(text_response)
     
     return Response(
-        content=complete_audio,
-        media_type="audio/mpeg",
+        content=audio_content,
+        media_type="audio/wav",
         headers={
-            "Content-Disposition": "attachment; filename=response.mp3"
+            "Content-Disposition": "attachment; filename=response.wav"
         }
     )
+
+# @app.post("/audio-to-audio-complete")
+# @inject
+# async def audio_to_audio_complete(
+#     audio_file: UploadFile = File(...), 
+#     conversation_id: str = Form(...), 
+#     stt_service = Depends(get_stt_service), 
+#     chat_service: ChatService = Depends(get_chat_service)
+# ):
+#     conversation_id = UUID(conversation_id)
+#     # Get transcript from STT service
+#     transcript = await stt_service.generate_audio(audio_file)
+    
+#     # Create a proper Message object
+#     from app.schema import Message
+#     from uuid import uuid4
+#     message = Message(id=str(uuid4()), role="user", content=transcript)
+    
+#     text_response = ""
+#     # Get complete text response
+#     async for chunk in chat_service.chat_response(conversation_id, message):
+#         json_chunk = json.loads(chunk)
+#         if "full_response" in json_chunk:
+#             text_response += json_chunk["full_response"]
+    
+#     if not text_response:
+#         raise HTTPException(status_code=500, detail="No response generated")
+
+#     # Collect all audio chunks into a single bytes object
+#     audio_chunks = []
+#     async for chunk in create_audio_stream(text_response):
+#         audio_chunks.append(chunk)
+    
+#     complete_audio = b''.join(audio_chunks)
+    
+#     return Response(
+#         content=complete_audio,
+#         media_type="audio/wav",
+#         headers={
+#             "Content-Disposition": "attachment; filename=response.wav"
+#         }
+#     )
 
 
 
