@@ -74,11 +74,9 @@ async def websocket_audio_chat(
     await manager.connect(websocket)
     try:
         while True:
-            # Use receive_json with a timeout to allow checking for new messages
             try:
                 data = await websocket.receive_json()
                 
-                # If we're currently processing a request, interrupt it
                 if manager.is_processing(websocket):
                     manager.set_processing(websocket, False)
                     await websocket.send_json({
@@ -86,32 +84,27 @@ async def websocket_audio_chat(
                         "message": "Previous request interrupted"
                     })
 
-                # Validate incoming message
                 if 'conversation_id' not in data or 'audio_data' not in data:
                     await websocket.send_json({
                         "type": "error",
-                        "message": "Missing required fields: conversation_id and audio_data"
+                        "message": "Missing required fields"
                     })
                     continue
 
-                # Set processing flag
                 manager.set_processing(websocket, True)
                 
                 conversation_id = data['conversation_id']
                 audio_data = data['audio_data']
                 
-                # Convert base64 to audio file-like object
                 audio_bytes = base64.b64decode(audio_data)
                 audio_file = UploadFile(
                     file=io.BytesIO(audio_bytes),
                     filename="audio.wav"
                 )
 
-                # Process audio
                 conversation_id_uuid = UUID(conversation_id)
                 transcript = await stt_service.generate_audio(audio_file)
                 
-                # Send transcript back to client
                 await websocket.send_json({
                     "type": "transcript",
                     "text": transcript
@@ -119,34 +112,39 @@ async def websocket_audio_chat(
 
                 message = Message(id=str(uuid4()), role="user", content=transcript)
                 
-                # Stream the chat response
+                # Get complete text response
                 text_response = ""
                 async for chunk in chat_service.chat_response(conversation_id_uuid, message):
-                    # Check if we've been interrupted
                     if not manager.is_processing(websocket):
                         break
-                        
+                    
                     json_chunk = json.loads(chunk)
                     if "full_response" in json_chunk:
-                        text_response += json_chunk["full_response"]
-                        # Send intermediate updates
-                        await websocket.send_json({
-                            "type": "text_chunk",
-                            "text": json_chunk["full_response"]
-                        })
+                        text_response = json_chunk["full_response"]
 
-                # Only proceed with audio generation if we haven't been interrupted
                 if manager.is_processing(websocket) and text_response:
-                    audio_content = await create_audio_from_text_without_streaming(text_response)
-                    audio_base64 = base64.b64encode(audio_content).decode('utf-8')
-                    
+                    # Send complete text response
                     await websocket.send_json({
-                        "type": "complete",
-                        "audio": audio_base64,
+                        "type": "text_response",
                         "text": text_response
                     })
+
+                    # Start streaming audio for the complete text
+                    async for audio_chunk in create_audio_stream(text_response):
+                        if not manager.is_processing(websocket):
+                            break
+                        audio_base64 = base64.b64encode(audio_chunk).decode('utf-8')
+                        print(audio_base64)
+                        await websocket.send_json({
+                            "type": "audio_chunk",
+                            "audio": audio_base64
+                        })
+                    
+                    # Signal audio streaming completion
+                    await websocket.send_json({
+                        "type": "audio_complete"
+                    })
                 
-                # Reset processing flag
                 manager.set_processing(websocket, False)
 
             except WebSocketDisconnect:
