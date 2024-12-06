@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from llama_index.core.readers.base import BaseReader
 from base import Document
+from llama_index.core.readers.file.base import default_file_metadata_func
 
 
 class UnstructuredReader(BaseReader):
@@ -11,7 +12,6 @@ class UnstructuredReader(BaseReader):
     def load_data(
         self,
         file: Path,
-        extra_info: Optional[Dict] = None,
         split_documents: Optional[bool] = False,
         **kwargs,
     ) -> List[Document]:
