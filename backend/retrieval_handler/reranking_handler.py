@@ -3,7 +3,7 @@ sys.path.append("..")
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from base import RetrievedDocument, BaseLLM, IRerankingHandler
 from .utils import re_0_10_rating
-
+import asyncio
 SYSTEMPROMPT_RERANKING = """You are a RELEVANCE grader; providing the relevance of the given CONTEXT to the given QUESTION.
         Respond only as a number from 0 to 10 where 0 is the least relevant and 10 is the most relevant.
 
@@ -40,20 +40,24 @@ class RerankingHandler(IRerankingHandler):
     async def rerank_documents(self, query:str, documents:list[RetrievedDocument]) -> list[RetrievedDocument]:
         filtered_documents = []
         documents = sorted(documents, key=lambda x: x.content)
+        async def process_document(doc):
+            messages = [
+                {"role": "system", "content": SYSTEMPROMPT_RERANKING},
+                {"role": "user", "content": USER_PROMPT_TEMPLATE.format(question=query, context=doc.content)}
+            ]
+            result = await self.llm.generate_response(messages)
+            return result
         with ThreadPoolExecutor() as executor:
             futures = []
             for doc in documents:
-                messages = []
-                messages.append({"role": "system", "content": SYSTEMPROMPT_RERANKING})
-                messages.append({"role": "user", "content": USER_PROMPT_TEMPLATE.format(question=query, context=doc.content)})
-                async def llm_call():
-                    return await self.llm.generate_response(messages)
-            futures.append(executor.submit(llm_call))
-        results = [future.result() for future in futures]
+                futures.append(executor.submit(lambda: asyncio.run(process_document(doc))))
+        results = [future.result() for future in as_completed(futures)]
+        print(results)
         results = [
             (r_idx, float(re_0_10_rating(result)) / 10)
             for r_idx, result in enumerate(results)
         ]
+
         results.sort(key=lambda x: x[1], reverse=True)
         for r_idx, score in results:
             doc = documents[r_idx]

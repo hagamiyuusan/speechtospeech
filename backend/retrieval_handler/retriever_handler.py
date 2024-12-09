@@ -39,29 +39,30 @@ class HybridRetriever(IRetriever):
         chunk_size = self.chunk_batch_size * 4
         for start_idx in range(0, len(all_chunks), chunk_size):
             chunks = all_chunks[start_idx : start_idx + chunk_size]
-            self.document_store.add_documents(chunks, table_name)
+            self.document_store.add_documents(table_name, chunks)
             docsWithEmbedding = self.embedder.get_embedding(chunks)
-            self.vector_store.add_documents(docsWithEmbedding, table_name)
+            self.vector_store.add_documents(table_name, docsWithEmbedding)
 
 
 
-    def retrieve(self,table_name: str,  query: str, top_k: int = 10) -> List[RetrievedDocument]:
+    async def retrieve(self, table_name: str,  query: str, top_k: int = 10) -> List[RetrievedDocument]:
         vs_docs = []
         vs_ids = []
         vs_scores = [] 
         ds_docs: list[RetrievedDocument] = []
-        async def query_vector_store():
-            nonlocal vs_docs
-            nonlocal vs_scores
-            nonlocal vs_ids
+        def query_vector_store():
+            nonlocal vs_docs , vs_ids, vs_scores
             query_embedding = self.embedder.get_embedding(query)[0].embedding
-            _, vs_scores, vs_ids = self.vector_store.query(query_embedding, top_k, table_name)
+            _, vs_scores, vs_ids = self.vector_store.query(table_name, query_embedding, top_k)
+            print(f"vs_ids: {vs_ids}")
+            print(f"vs_scores: {vs_scores}")
             if vs_ids:
-                vs_docs = self.document_store.get_document(vs_ids, table_name)
+                vs_docs = self.document_store.get_document(table_name, vs_ids)
 
         def query_document_store():
             nonlocal ds_docs
-            ds_docs = self.document_store.query(query, top_k, table_name)
+            if self.document_store is not None:
+                ds_docs = self.document_store.query(table_name, query, top_k)
 
         with ThreadPoolExecutor() as executor:
             future_vs = executor.submit(query_vector_store)
@@ -69,14 +70,21 @@ class HybridRetriever(IRetriever):
         
             future_vs.result()
             future_ds.result()
+        
+        print(f"ds_docs: {len(ds_docs)}")
+        print(f"vs_docs: {len(vs_docs)}")
+        differences = [doc.id_ for doc in ds_docs if doc.id_ in vs_ids]
 
-        results = [
+
+
+        not_in_vs = [
             RetrievedDocument(**doc.to_dict(),score=-1.0) for doc in ds_docs 
             if doc.id_ not in vs_ids]
-        results += [
+        combine_not_in_vs_and_vs = [
             RetrievedDocument(**doc.to_dict(),score=score) for doc,score in zip(vs_docs,vs_scores)
         ]
-        results = sorted(results, key=lambda x: x.score, reverse=True)
-        results = results[:top_k]
+        sort_by_score = sorted(combine_not_in_vs_and_vs, key=lambda x: x.score, reverse=True)
+        reranked = await self.reranker.rerank_documents(query, sort_by_score)
+        results = reranked[:top_k]
         return results
 

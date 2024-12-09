@@ -12,6 +12,7 @@ class UnstructuredReader(BaseReader):
     def load_data(
         self,
         file: Path,
+        extra_info: Optional[Dict] = None,
         split_documents: Optional[bool] = False,
         **kwargs,
     ) -> List[Document]:

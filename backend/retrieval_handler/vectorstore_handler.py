@@ -11,6 +11,7 @@ from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 
 class VectorStoreHandler(IVectorStore):
     def __init__(self,path: str = "./vectorstore"):
+        print(path)
         self.chroma_client = chromadb.PersistentClient(path=path)
         self._collections = {}
 
@@ -19,8 +20,7 @@ class VectorStoreHandler(IVectorStore):
         if collection_name not in self._collections:
             chrome_collection = self.chroma_client.get_or_create_collection(collection_name)
             vector_store = ChromaVectorStore(chroma_collection=chrome_collection, stores_text=True)
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            self._collections[collection_name] = storage_context
+            self._collections[collection_name] = vector_store
         return self._collections[collection_name]
 
 
@@ -42,7 +42,8 @@ class VectorStoreHandler(IVectorStore):
     def query(self, collection_name: str, query_embedding, top_k: int = 10) :
         vector_store = self.get_collection(collection_name)
         results = vector_store.query(
-            query=VectorStoreQuery(query_embedding=query_embedding, similarity_top_k=top_k)
+            query=VectorStoreQuery(query_embedding=query_embedding,
+                                   similarity_top_k=top_k)
         )
         embeddings = []
         if results.nodes:
