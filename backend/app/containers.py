@@ -25,18 +25,16 @@ class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
 
     db_session = providers.Singleton(
-        AsyncSessionLocal
+        AsyncSessionLocal   
     )
 
     document_store = providers.Singleton(
         DocumentStoreHandler,
         uri = config.document_store.uri,
-        table_name=config.document_store.table_name,
         top_k=config.document_store.top_k)
     
     vector_store = providers.Singleton(
         VectorStoreHandler,
-        collection_name=config.vector_store.collection_name,
         path = config.vector_store.path
     )
     embedder = providers.Singleton(

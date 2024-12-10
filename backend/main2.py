@@ -7,6 +7,7 @@ from app.services import ChatService
 from app.schema import ChatRequest, ConversationBase, ChatAudioRequest
 from typing import List
 from uuid import UUID
+import asyncio
 import uvicorn
 from dependency_injector.wiring import inject
 import json
@@ -83,6 +84,7 @@ async def websocket_audio_chat(
                         "type": "interrupt",
                         "message": "Previous request interrupted"
                     })
+                    await asyncio.sleep(0.5)
 
                 if 'conversation_id' not in data or 'audio_data' not in data:
                     await websocket.send_json({
@@ -134,16 +136,14 @@ async def websocket_audio_chat(
                         if not manager.is_processing(websocket):
                             break
                         audio_base64 = base64.b64encode(audio_chunk).decode('utf-8')
-                        print(audio_base64)
                         await websocket.send_json({
                             "type": "audio_chunk",
                             "audio": audio_base64
                         })
-                    
-                    # Signal audio streaming completion
-                    await websocket.send_json({
-                        "type": "audio_complete"
-                    })
+                    if manager.is_processing(websocket):    
+                        await websocket.send_json({
+                            "type": "audio_complete"
+                        })
                 
                 manager.set_processing(websocket, False)
 
