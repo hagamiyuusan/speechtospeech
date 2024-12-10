@@ -14,7 +14,7 @@ COPY requirements.txt .
 
 RUN pip install -r requirements.txt
 
-COPY config.yaml /app/config.yaml
+# COPY config.yaml /app/config.yaml
 RUN pip install "unstructured"
 COPY . .
 
