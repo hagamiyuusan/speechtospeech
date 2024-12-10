@@ -179,7 +179,7 @@ async def create_audio_stream(text: str):
             input=text,
             response_format ="wav"
     ) as response:
-        async for chunk in response.iter_bytes(1024):
+        async for chunk in response.iter_bytes(4096):
             # stream.write(chunk)
             yield chunk
     # stream.stop_stream()
