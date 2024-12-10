@@ -17,6 +17,32 @@ import base64
 import io
 from app.schema import Message
 from uuid import uuid4
+from asyncio import Queue
+
+import re
+from typing import List, Generator
+
+def split_into_sentences(text: str) -> List[str]:
+    """Split text into sentences while preserving punctuation."""
+    # Basic sentence splitting on .!?
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    return [s.strip() for s in sentences if s.strip()]
+
+def chunk_text(text: str, min_chunk_size: int = 50) -> Generator[str, None, None]:
+    """Yield chunks of text, trying to break at sentence boundaries."""
+    buffer = ""
+    sentences = split_into_sentences(text)
+    
+    for sentence in sentences:
+        buffer += sentence + " "
+        if len(buffer) >= min_chunk_size:
+            yield buffer.strip()
+            buffer = ""
+    
+    if buffer:  # Don't forget the last piece
+        yield buffer.strip()
+
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
@@ -168,11 +194,7 @@ async def  get_transcript(input: UploadFile, stt_service = Depends(get_stt_servi
 @inject
 async def create_audio_stream(text: str):
     client = container.openai_client()
-    # p = pyaudio.PyAudio()
-    # stream = p.open(format=8,
-    #                 channels=1,
-    #                 rate=24_000,
-    #                 output=True)
+
     async with client.audio.speech.with_streaming_response.create(
             model="tts-1",
             voice="alloy",
@@ -180,11 +202,8 @@ async def create_audio_stream(text: str):
             response_format ="wav"
     ) as response:
         async for chunk in response.iter_bytes(4096):
-            # stream.write(chunk)
             yield chunk
-    # stream.stop_stream()
-    # stream.close()
-    # p.terminate()
+
 
 
 @inject 
