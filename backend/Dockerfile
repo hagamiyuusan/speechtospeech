@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 RUN pip install -r requirements.txt
+
+COPY config.yaml /app/config.yaml
 RUN pip install "unstructured"
 COPY . .
 
