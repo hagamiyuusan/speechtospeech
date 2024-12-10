@@ -2,19 +2,19 @@ import sys
 sys.path.append("..")
 from base import IRAGHandler
 from base import BaseLLM
+from base import IAgent
 from typing import List
 from dependency_injector.wiring import inject, Provide
 from uuid import  uuid4
 from schemas import Message
 from .utils import SYSTEM_PROMPT_MAIN_AGENT
-class MainAgent:
+class MainAgent(IAgent):
     @inject
-    def __init__(self, llm_handler: BaseLLM = None, rag_handler: IRAGHandler = None):
+    def __init__(self, llm_handler: BaseLLM = None, rag_handler: IRAGHandler = None ):
         self.llm_handler = llm_handler
         self.rag_handler = rag_handler
         self.agent_functions = {
-            "rag_handler": self.rag_handler.generate_response,
-
+            "rag_handler": lambda query: self.rag_handler.generate_response(table_name="asian", query=query, model_name="gpt-4o")
         }
         self.system_prompt = SYSTEM_PROMPT_MAIN_AGENT.format(tools=str(list(self.agent_functions.keys())))
         self.tools = [
@@ -47,6 +47,8 @@ class MainAgent:
         message_objects = []
         for msg in messages:
             if isinstance(msg, dict):
+                if 'id' not in msg:
+                    msg['id'] = str(uuid4())
                 message_objects.append(Message(**msg))
             else:
                 message_objects.append(msg)

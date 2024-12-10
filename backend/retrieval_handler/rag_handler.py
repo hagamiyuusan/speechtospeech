@@ -30,14 +30,13 @@ class RAGHandler(IRAGHandler):
         self.retriever = retriever
         self.llm = llm
 
-    async def generate_response(self, query:str, top_k:int = 10):
-        documents = self.retriever.retrieve(query, top_k)
+    async def generate_response(self, table_name:str, query:str, top_k:int = 10, model_name:str = "gpt-4o"):
+        documents = await self.retriever.retrieve(table_name, query, top_k)
         evidence = prepare_envidence(documents)
-        print(evidence)
         rag_template = []
         rag_template.append({"role": "system", "content": SYSTEM_PROMPT_RAG})
         rag_template.append({"role": "user", "content": USER_PROMPT_RAG.format(context=evidence, question=query)})
-        return await self.llm.generate_response(messages=rag_template, model_name="gpt-4o")
+        return await self.llm.generate_response(messages=rag_template, model_name=model_name)
 
         
     

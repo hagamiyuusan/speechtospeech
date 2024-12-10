@@ -8,7 +8,6 @@ class LLMHandler(BaseLLM):
     def __init__(self, api_key: str, model_name = "gpt-4o"):
         self.client = AsyncOpenAI(api_key=api_key)
         self.model_name = model_name
-        print(self.model_name)
 
     async def generate_response(self, messages: list[dict] | str, tools: list = None, function_map : dict = None, model_name: str = None):
         user_messages = messages.copy()
@@ -39,6 +38,8 @@ class LLMHandler(BaseLLM):
                 return await self.generate_response(user_messages, tools, function_map)
 
         else:
+            print(user_messages)
+            print(model_name if model_name else self.model_name)
             response = await self.client.chat.completions.create(
                 model=model_name if model_name else self.model_name,
                 messages=user_messages,

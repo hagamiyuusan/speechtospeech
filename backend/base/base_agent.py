@@ -9,6 +9,6 @@ class IAgent(ABC):
         pass
 
     @abstractmethod
-    def handle_query(self, query: str) -> str:
+    def response(self, messages: List[dict]) -> str:
         pass
 
