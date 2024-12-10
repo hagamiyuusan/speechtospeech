@@ -47,12 +47,8 @@ class RerankingHandler(IRerankingHandler):
             ]
             result = await self.llm.generate_response(messages)
             return result
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for doc in documents:
-                futures.append(executor.submit(lambda: asyncio.run(process_document(doc))))
-        results = [future.result() for future in as_completed(futures)]
-        print(results)
+        results = await asyncio.gather(*[process_document(doc) for doc in documents])
+
         results = [
             (r_idx, float(re_0_10_rating(result)) / 10)
             for r_idx, result in enumerate(results)

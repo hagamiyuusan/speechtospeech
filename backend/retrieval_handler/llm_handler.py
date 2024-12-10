@@ -38,12 +38,12 @@ class LLMHandler(BaseLLM):
                 return await self.generate_response(user_messages, tools, function_map)
 
         else:
-            print(user_messages)
-            print(model_name if model_name else self.model_name)
             response = await self.client.chat.completions.create(
                 model=model_name if model_name else self.model_name,
                 messages=user_messages,
-                temperature=0.7)
+                temperature=0.7,
+                stream=False  # Make sure this is False for reranking
+            )
             return response.choices[0].message.content
     
 

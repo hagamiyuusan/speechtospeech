@@ -84,7 +84,7 @@ class HybridRetriever(IRetriever):
             RetrievedDocument(**doc.to_dict(),score=score) for doc,score in zip(vs_docs,vs_scores)
         ]
         sort_by_score = sorted(combine_not_in_vs_and_vs, key=lambda x: x.score, reverse=True)
-        reranked = await self.reranker.rerank_documents(query, sort_by_score)
-        results = reranked[:top_k]
+        sort_by_score = await self.reranker.rerank_documents(query, sort_by_score)
+        results = sort_by_score[:top_k]
         return results
 
