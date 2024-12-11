@@ -17,7 +17,8 @@ class STT(IVoice):
             
             response = await self.client.audio.transcriptions.create(
                 file=audio_file,
-                model="whisper-large-v3"
+                model="whisper-large-v3-turbo",
+                prompt="This audio taking place in a conference room. Tell me the speaker's language, then give me the transcript of the audio in the speaker's language."
             )
             return response.text.strip()
         except Exception as e:
