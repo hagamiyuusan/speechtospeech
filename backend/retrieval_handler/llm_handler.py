@@ -15,7 +15,7 @@ class LLMHandler(BaseLLM):
             response = await self.client.chat.completions.create(
                 model= model_name if model_name else self.model_name,
                 messages=user_messages,
-                temperature=0.7,
+                temperature=0.1,
                 tools=tools,
                 tool_choice= "auto")
             response_message = response.choices[0].message
@@ -41,7 +41,7 @@ class LLMHandler(BaseLLM):
             response = await self.client.chat.completions.create(
                 model=model_name if model_name else self.model_name,
                 messages=user_messages,
-                temperature=0.7,
+                temperature=0.3,
                 stream=False  # Make sure this is False for reranking
             )
             return response.choices[0].message.content
@@ -53,7 +53,7 @@ class LLMHandler(BaseLLM):
             response = await self.client.chat.completions.create(
                 model=model_name if model_name else self.model_name,
                 messages=user_messages,
-                temperature=0.7,
+                temperature=0.1,
                 tools=tools,
                 tool_choice="auto",
                 stream=True  # Enable streaming
@@ -112,7 +112,7 @@ class LLMHandler(BaseLLM):
             response = await self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                temperature=0.7,
+                temperature=0.1,
                 stream=True
             )
             
