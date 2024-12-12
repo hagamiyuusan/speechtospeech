@@ -132,13 +132,16 @@ async def websocket_audio_chat(
 
                 conversation_id_uuid = UUID(conversation_id)
                 transcript = await stt_service.generate_audio(audio_file)
+                print(transcript)
                 
                 await websocket.send_json({
                     "type": "transcript",
-                    "text": transcript
+                    "text": transcript["text"],
+                    "language": transcript["language"]
                 })
-
-                message = Message(id=str(uuid4()), role="user", content=transcript)
+                
+                question = f"{transcript['text']}. Please answer in {transcript['language']}. Helpful answer:"
+                message = Message(id=str(uuid4()), role="user", content=question)
                 
                 # Get complete text response
                 text_response = ""
@@ -244,10 +247,13 @@ async def audio_to_audio(audio_file: UploadFile = File(...), conversation_id: st
     conversation_id = UUID(conversation_id)
     # Get transcript from STT service
     transcript = await stt_service.generate_audio(audio_file)
-    
+    language = transcript["language"]
+    transcription = transcript["text"]
+
+    question = f"{transcription}. Please answer in {language}. Helpful answer:"
     # Create a proper Message object
 
-    message = Message(id=str(uuid4()), role="user", content=transcript)
+    message = Message(id=str(uuid4()), role="user", content=question)
     
     text_response = ""
     # Pass the Message object instead of the transcript string
