@@ -18,11 +18,11 @@ class STT(IVoice):
             response = await self.client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3",
-                prompt="his audio contains a conversation about ASEAN which contains multiple languages. Please transcribe accurately.",
+                prompt="This audio contains a conversation about ASEAN which contains multiple languages. Please transcribe accurately.",
                 response_format="verbose_json"
             )
             print(response)
-            return {"text": response.text.strip(), "language": response.language}
+            return {"text": response.text.strip(), "language": response.language, "no_speech_prob": response.segments[0]["no_speech_prob"]}
         except Exception as e:
             raise RuntimeError(f"Transcription failed: {str(e)}")
 
