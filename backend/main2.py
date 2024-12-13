@@ -155,13 +155,16 @@ def get_stt_service():
 def get_openai_client():
     return container.openai_client()
 
+def get_llm_service():
+    return container.llm()
 
 @app.websocket("/ws/audio-chat")
 @inject
 async def websocket_audio_chat(
     websocket: WebSocket,
     stt_service = Depends(get_stt_service),
-    chat_service: ChatService = Depends(get_chat_service)
+    chat_service: ChatService = Depends(get_chat_service),
+    openai_client = Depends(get_openai_client)
 ):
     await manager.connect(websocket)
     try:
@@ -199,10 +202,16 @@ async def websocket_audio_chat(
 
                 print(transcript)
                 if transcript["no_speech_prob"] < 0.1:
+                    response = await openai_client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language"}],
+                        temperature=0.7
+                    )
+                    language = response.choices[0].message.content
                     await websocket.send_json({
                         "type": "transcript",
                         "text": transcript["text"],
-                        "language": transcript["language"]
+                        "language": language
                     })
                 else:
                     await websocket.send_json({
@@ -272,6 +281,7 @@ async def websocket_audio_chat(
                             "type": "text_delta",
                             "text": json_chunk["content"]
                         })
+
                     if "full_response" in json_chunk:
                         text_response = json_chunk["full_response"]
 
