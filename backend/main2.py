@@ -44,43 +44,62 @@ def chunk_text(text: str, min_chunk_size: int = 50) -> Generator[str, None, None
 container = Container()
 container.config.from_yaml('config.yaml')
 container.wire(modules=[__name__])
+# class StreamBuffer:
+#     def __init__(self, min_chunk_size: int = 50):
+#         self.current_buffer = ""
+#         self.min_chunk_size = min_chunk_size
+
+#     def add_text(self, text: str) -> Generator[str, None, None]:
+#         """Add text to buffer and return complete chunks."""
+#         self.current_buffer += text
+        
+#         # Only split on actual sentence endings
+#         if any(end in self.current_buffer for end in ['.', '!', '?']):
+#             sentences = split_into_sentences(self.current_buffer)
+            
+#             # Keep the last potentially incomplete sentence in the buffer
+#             if self.current_buffer[-1] not in ['.', '!', '?']:
+#                 self.current_buffer = sentences[-1]
+#                 sentences = sentences[:-1]
+#             else:
+#                 self.current_buffer = ""
+            
+#             buffer = ""
+#             for sentence in sentences:
+#                 if len(sentence) > self.min_chunk_size:
+#                     # Yield long sentences directly
+#                     yield sentence.strip()
+#                     continue
+                
+#                 buffer += sentence + " "
+#                 if len(buffer) >= self.min_chunk_size:
+#                     yield buffer.strip()
+#                     buffer = ""
+            
+#             # Update current buffer with remaining content
+#             if buffer:
+#                 self.current_buffer = buffer.strip() + " " + self.current_buffer
+
+import re
+
 class StreamBuffer:
     def __init__(self, min_chunk_size: int = 50):
         self.current_buffer = ""
         self.min_chunk_size = min_chunk_size
 
     def add_text(self, text: str) -> Generator[str, None, None]:
-        """Add text to buffer and return complete chunks."""
         self.current_buffer += text
+
+        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s', self.current_buffer) #Improved regex
+        complete_sentences = sentences[:-1]  # All but the last one
+
+        for sentence in complete_sentences:
+            if len(sentence.strip()) >= self.min_chunk_size:
+                yield sentence.strip()
+            elif sentence.strip(): #Yield not empty sentences
+                yield sentence.strip()
         
-        # Only split on actual sentence endings
-        if any(end in self.current_buffer for end in ['.', '!', '?']):
-            sentences = split_into_sentences(self.current_buffer)
-            
-            # Keep the last potentially incomplete sentence in the buffer
-            if self.current_buffer[-1] not in ['.', '!', '?']:
-                self.current_buffer = sentences[-1]
-                sentences = sentences[:-1]
-            else:
-                self.current_buffer = ""
-            
-            buffer = ""
-            for sentence in sentences:
-                if len(sentence) > self.min_chunk_size:
-                    # Yield long sentences directly
-                    yield sentence.strip()
-                    continue
-                
-                buffer += sentence + " "
-                if len(buffer) >= self.min_chunk_size:
-                    yield buffer.strip()
-                    buffer = ""
-            
-            # Update current buffer with remaining content
-            if buffer:
-                self.current_buffer = buffer.strip() + " " + self.current_buffer
-
-
+        self.current_buffer = sentences[-1] if sentences else "" #Only keep the last incomplete sentence
 class TTSManager:
     def __init__(self):
         self.voice_settings: Dict[str, dict] = {
@@ -203,8 +222,8 @@ async def websocket_audio_chat(
                 print(transcript)
                 if transcript["no_speech_prob"] < 0.1:
                     response = await openai_client.chat.completions.create(
-                        model="gpt-4o-mini",
-                        messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language"}],
+                        model="gpt-4o",
+                        messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language or country"}],
                         temperature=0.7
                     )
                     language = response.choices[0].message.content
@@ -240,10 +259,6 @@ async def websocket_audio_chat(
                                 "type": "audio_chunk",
                                 "audio": base64.b64encode(audio_chunk).decode('utf-8')
                             })
-                        await websocket.send_json({
-                            "type": "sentence_complete",
-                            "sentence": sentence
-                        })
                     except Exception as e:
                         logger.error(f"TTS processing error: {str(e)}")
                         await websocket.send_json({
@@ -274,7 +289,6 @@ async def websocket_audio_chat(
                     if "content" in json_chunk:
                         text_response += json_chunk["content"]
                         complete_sentences = list(stream_buffer.add_text(json_chunk["content"]))
-                        print(complete_sentences)
                         for sentence in complete_sentences:
                             await processing_queue.put(sentence)
 
