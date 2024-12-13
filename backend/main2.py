@@ -277,10 +277,6 @@ async def websocket_audio_chat(
                         print(complete_sentences)
                         for sentence in complete_sentences:
                             await processing_queue.put(sentence)
-                        await websocket.send_json({
-                            "type": "text_delta",
-                            "text": json_chunk["content"]
-                        })
 
                     if "full_response" in json_chunk:
                         text_response = json_chunk["full_response"]
