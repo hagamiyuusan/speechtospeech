@@ -18,7 +18,7 @@ class STT(IVoice):
             response = await self.client.audio.transcriptions.create(
                 file=audio_file,
                 model="whisper-large-v3",
-                prompt="This audio contains a conversation about ASEAN which contains multiple languages. Please transcribe accurately.",
+                prompt="his audio contains a conversation about ASEAN which contains multiple languages. Please transcribe accurately.",
                 response_format="verbose_json"
             )
             print(response)
