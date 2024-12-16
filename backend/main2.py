@@ -217,7 +217,14 @@ async def websocket_audio_chat(
                 )
 
                 conversation_id_uuid = UUID(conversation_id)
-                transcript = await stt_service.generate_audio(audio_file)
+                try:
+                    transcript = await stt_service.generate_audio(audio_file)
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": str(e)
+                    })
+                    continue
 
                 print(transcript)
                 if transcript["no_speech_prob"] < 0.1:
