@@ -10,13 +10,12 @@ from uuid import UUID, uuid4
 from datetime import datetime
 from agent.main_agent import MainAgent
 from retrieval_handler.llm_handler import LLMHandler
-
+from agent.agent_manager import AgentManager
 class ChatService:
-    def __init__(self, redis_url: str, session: AsyncSession, agent: MainAgent, llm_handler: LLMHandler):
-        print(redis_url)
+    def __init__(self, redis_url: str, session: AsyncSession, agent_manager: AgentManager, llm_handler: LLMHandler):
         self.redis = aioredis.from_url(redis_url, encoding="utf-8", decode_responses=True)
         self.session = session
-        self.agent = agent
+        self.agent_manager = agent_manager
         self.llm_handler = llm_handler
 
     async def generate_title(self, content: str):
@@ -127,7 +126,7 @@ class ChatService:
     async def chat_response_without_stream(self, id: UUID, message: Message):
         return await self.chat_response(id, message, stream=False)
 
-    async def chat_response(self, id: UUID, message: Message):
+    async def chat_response(self, id: UUID, message: Message, user_id: str):
         try:
             convo = await self.load_conversation(id)
             message_dict = {

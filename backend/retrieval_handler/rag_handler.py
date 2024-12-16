@@ -38,6 +38,12 @@ class RAGHandler(IRAGHandler):
         rag_template.append({"role": "user", "content": USER_PROMPT_RAG.format(context=evidence, question=query)})
         response = await self.llm.generate_response(messages=rag_template, model_name=model_name)
         return response
+    
+    async def get_raw_response(self, table_name:str, query:str, top_k:int = 10, model_name:str = "gpt-4o"):
+        documents = await self.retriever.retrieve(table_name, query, top_k)
+        evidence = prepare_envidence(documents)
+        question = USER_PROMPT_RAG.format(context=evidence, question=query)
+        return question
 
         
     

@@ -221,16 +221,16 @@ async def websocket_audio_chat(
 
                 print(transcript)
                 if transcript["no_speech_prob"] < 0.1:
-                    response = await openai_client.chat.completions.create(
-                        model="gpt-4o",
-                        messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language or country"}],
-                        temperature=0.7
-                    )
-                    language = response.choices[0].message.content
+                    # response = await openai_client.chat.completions.create(
+                    #     model="gpt-4o",
+                    #     messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language or country"}],
+                    #     temperature=0.7
+                    # )
+                    # language = response.choices[0].message.content
                     await websocket.send_json({
                         "type": "transcript",
                         "text": transcript["text"],
-                        "language": language
+                        "language": transcript["language"]
                     })
                 else:
                     await websocket.send_json({

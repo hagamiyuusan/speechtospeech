@@ -43,3 +43,4 @@ backend/.env
 backend/audio/*
 backend/output_audio/*
 backend/*.mp3
+backend/sample_audio/*
