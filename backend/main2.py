@@ -133,21 +133,14 @@ async def websocket_audio_chat(
                 conversation_id_uuid = UUID(conversation_id)
                 transcript = await stt_service.generate_audio(audio_file)
 
-                print(transcript)
-                if transcript["no_speech_prob"] < 0.1:
-                    await websocket.send_json({
-                        "type": "transcript",
-                        "text": transcript["text"],
-                        "language": transcript["language"]
-                    })
-                else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": "No speech detected"
-                    })
-                    continue
+                await websocket.send_json({
+                    "type": "transcript",
+                    "text": transcript["text"],
+                    "language": transcript["language"]
+                })
+
                 
-                question = f"{transcript['text']}. Please answer in {transcript['language']}. Helpful answer:"
+                question = f"{transcript['text']}. You MUST answer in {transcript['language']}. Helpful answer:"
                 message = Message(id=str(uuid4()), role="user", content=question)
                 
                 # Get complete text response

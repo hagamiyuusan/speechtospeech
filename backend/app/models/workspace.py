@@ -10,3 +10,6 @@ class Workspace(Base):
     collection_name = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now()) 
+
+
+    admin = relationship("User", back_populates="workspaces")
