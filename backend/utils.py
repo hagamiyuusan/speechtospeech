@@ -44,3 +44,5 @@ async def generateResponse(messages: List[Message]) -> StreamingResponse:
         generate_response_chunks(messages),
         media_type="text/event-stream"
     )
+
+
