@@ -11,3 +11,6 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
+
+    conversations = relationship("Conversation", back_populates="user")
+    workspaces = relationship("Workspace", secondary="workspace_users", back_populates="users")
