@@ -44,41 +44,6 @@ def chunk_text(text: str, min_chunk_size: int = 50) -> Generator[str, None, None
 container = Container()
 container.config.from_yaml('config.yaml')
 container.wire(modules=[__name__])
-# class StreamBuffer:
-#     def __init__(self, min_chunk_size: int = 50):
-#         self.current_buffer = ""
-#         self.min_chunk_size = min_chunk_size
-
-#     def add_text(self, text: str) -> Generator[str, None, None]:
-#         """Add text to buffer and return complete chunks."""
-#         self.current_buffer += text
-        
-#         # Only split on actual sentence endings
-#         if any(end in self.current_buffer for end in ['.', '!', '?']):
-#             sentences = split_into_sentences(self.current_buffer)
-            
-#             # Keep the last potentially incomplete sentence in the buffer
-#             if self.current_buffer[-1] not in ['.', '!', '?']:
-#                 self.current_buffer = sentences[-1]
-#                 sentences = sentences[:-1]
-#             else:
-#                 self.current_buffer = ""
-            
-#             buffer = ""
-#             for sentence in sentences:
-#                 if len(sentence) > self.min_chunk_size:
-#                     # Yield long sentences directly
-#                     yield sentence.strip()
-#                     continue
-                
-#                 buffer += sentence + " "
-#                 if len(buffer) >= self.min_chunk_size:
-#                     yield buffer.strip()
-#                     buffer = ""
-            
-#             # Update current buffer with remaining content
-#             if buffer:
-#                 self.current_buffer = buffer.strip() + " " + self.current_buffer
 
 import re
 
@@ -228,12 +193,7 @@ async def websocket_audio_chat(
 
                 print(transcript)
                 if transcript["no_speech_prob"] < 0.1:
-                    # response = await openai_client.chat.completions.create(
-                    #     model="gpt-4o",
-                    #     messages=[{"role": "user", "content": f"What is the language of this text: {transcript['text']}, just return the name of language or country"}],
-                    #     temperature=0.7
-                    # )
-                    # language = response.choices[0].message.content
+
                     await websocket.send_json({
                         "type": "transcript",
                         "text": transcript["text"],
@@ -366,22 +326,23 @@ async def create_audio_from_text_without_streaming(text: str):
 @inject
 async def chat(
     request: ChatRequest,
+    workspace_id: str,
+    user_id: str,  # This should come from your authentication system
     chat_service: ChatService = Depends(get_chat_service)
 ):
-    conversation_id = UUID(request.conversation_id)
-    message = request.message
-    
-    async def stream_response():
-        try:
-            async for chunk in chat_service.chat_response(conversation_id, message):
-                yield chunk
-        except Exception as e:
-            yield json.dumps({"error": str(e)}) + "\n"
-        finally:
-            # Ensure stream completion
-            yield json.dumps({"done": True}) + "\n"
-            
-    return StreamingResponse(stream_response(), media_type="text/event-stream")
+    """Chat endpoint that uses workspace's agent"""
+    try:
+        response = await chat_service.chat_response(
+            id=request.conversation_id,
+            message=request.message,
+            user_id=user_id,
+            workspace_id=workspace_id
+        )
+        return {"response": response}
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/audio-to-audio")
 @inject
@@ -421,83 +382,7 @@ async def audio_to_audio(audio_file: UploadFile = File(...), conversation_id: st
     )
 
 
-@app.post("/audio-to-audio-full")
-@inject
-async def audio_to_audio_full(
-    audio_file: UploadFile = File(...), 
-    conversation_id: str = Form(...), 
-    stt_service = Depends(get_stt_service), 
-    chat_service: ChatService = Depends(get_chat_service)
-):
-    conversation_id = UUID(conversation_id)
-    # Get transcript from STT service
-    transcript = await stt_service.generate_audio(audio_file)
-    
 
-    message = Message(id=str(uuid4()), role="user", content=transcript)
-    
-    text_response = ""
-    # Get complete text response
-    async for chunk in chat_service.chat_response(conversation_id, message):
-        json_chunk = json.loads(chunk)
-        if "full_response" in json_chunk:
-            text_response += json_chunk["full_response"]
-    
-    if not text_response:
-        raise HTTPException(status_code=500, detail="No response generated")
-
-    # Use create_audio_from_text instead of collecting chunks
-    audio_content = await create_audio_from_text_without_streaming(text_response)
-    
-    return Response(
-        content=audio_content,
-        media_type="audio/wav",
-        headers={
-            "Content-Disposition": "attachment; filename=response.wav"
-        }
-    )
-
-# @app.post("/audio-to-audio-complete")
-# @inject
-# async def audio_to_audio_complete(
-#     audio_file: UploadFile = File(...), 
-#     conversation_id: str = Form(...), 
-#     stt_service = Depends(get_stt_service), 
-#     chat_service: ChatService = Depends(get_chat_service)
-# ):
-#     conversation_id = UUID(conversation_id)
-#     # Get transcript from STT service
-#     transcript = await stt_service.generate_audio(audio_file)
-    
-#     # Create a proper Message object
-#     from app.schema import Message
-#     from uuid import uuid4
-#     message = Message(id=str(uuid4()), role="user", content=transcript)
-    
-#     text_response = ""
-#     # Get complete text response
-#     async for chunk in chat_service.chat_response(conversation_id, message):
-#         json_chunk = json.loads(chunk)
-#         if "full_response" in json_chunk:
-#             text_response += json_chunk["full_response"]
-    
-#     if not text_response:
-#         raise HTTPException(status_code=500, detail="No response generated")
-
-#     # Collect all audio chunks into a single bytes object
-#     audio_chunks = []
-#     async for chunk in create_audio_stream(text_response):
-#         audio_chunks.append(chunk)
-    
-#     complete_audio = b''.join(audio_chunks)
-    
-#     return Response(
-#         content=complete_audio,
-#         media_type="audio/wav",
-#         headers={
-#             "Content-Disposition": "attachment; filename=response.wav"
-#         }
-#     )
 
 
 
@@ -538,16 +423,34 @@ async def chat_to_audio(
 @inject
 async def load_conversation(
     conversation_id: UUID,
+    user_id: str,  # This should come from your authentication system
     chat_service: ChatService = Depends(get_chat_service)
 ):
-    return await chat_service.load_conversation(conversation_id)
+    """Load a conversation with access control"""
+    try:
+        conversation = await chat_service.load_conversation(conversation_id, user_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return conversation
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/conversations/", response_model=List[ConversationBase])
+@app.get("/conversations/")
 @inject
 async def list_conversations(
+    workspace_id: str,
+    user_id: str,  # This should come from your authentication system
     chat_service: ChatService = Depends(get_chat_service)
 ):
-    return await chat_service.list_conversations()
+    """List conversations for a user in a workspace"""
+    try:
+        return await chat_service.list_conversations(user_id, workspace_id)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/tts")

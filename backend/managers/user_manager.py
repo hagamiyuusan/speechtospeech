@@ -1,22 +1,28 @@
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from .base_manager import BaseManager
 from app.models.user import User
-from app.security import get_password_hash, verify_password
+from uuid import UUID
 
 class UserManager(BaseManager[User]):
-    def __init__(self, db: Session):
+    """Manages user operations without security features (MVP version)"""
+    
+    def __init__(self, db: AsyncSession):
         super().__init__(db, User)
     
-    async def create_user(self, username: str, email: str, password: str) -> User:
-        """Create a new user with hashed password"""
+    async def create_user(self, username: str, email: str) -> User:
+        """Create a new user without password"""
         try:
             # Check if user already exists
-            existing_user = await self.db.query(User).filter(
+            stmt = select(User).where(
                 (User.username == username) | (User.email == email)
-            ).first()
+            )
+            result = await self.db.execute(stmt)
+            existing_user = result.scalar_one_or_none()
             
             if existing_user:
                 raise HTTPException(
@@ -24,11 +30,10 @@ class UserManager(BaseManager[User]):
                     detail="Username or email already registered"
                 )
             
-            hashed_password = get_password_hash(password)
             user_data = {
                 "username": username,
                 "email": email,
-                "hashed_password": hashed_password
+                "is_active": True
             }
             
             return await self.create(user_data)
@@ -36,22 +41,23 @@ class UserManager(BaseManager[User]):
             await self.db.rollback()
             raise HTTPException(status_code=400, detail=str(e))
     
-    async def authenticate_user(self, username: str, password: str) -> Optional[User]:
-        """Authenticate a user by username and password"""
-        try:
-            user = await self.db.query(User).filter(User.username == username).first()
-            if not user or not verify_password(password, user.hashed_password):
-                return None
-            return user
-        except SQLAlchemyError as e:
-            raise HTTPException(status_code=400, detail=str(e))
-    
-    async def get_user_workspaces(self, user_id: str) -> List[dict]:
+    async def get_user_workspaces(self, user_id: str | UUID) -> List[dict]:
         """Get all workspaces for a user"""
         try:
+            # Convert UUID to string if necessary
+            if isinstance(user_id, UUID):
+                user_id = str(user_id)
+                
             user = await self.get(user_id)
             if not user:
                 raise HTTPException(status_code=404, detail="User not found")
+            
+            # Load workspaces relationship
+            stmt = select(User).where(User.id == user_id).options(
+                selectinload(User.workspaces)
+            )
+            result = await self.db.execute(stmt)
+            user = result.scalar_one_or_none()
             
             return [
                 {

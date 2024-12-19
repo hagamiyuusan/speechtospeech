@@ -18,3 +18,4 @@ tantivy
 pydantic-settings
 groq
 python-multipart
+aioredis

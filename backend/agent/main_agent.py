@@ -2,10 +2,13 @@ import sys
 sys.path.append("..")
 from abc import ABC, abstractmethod
 from base import IRAGHandler, BaseLLM, IAgent
+from app.models import Agent
 from typing import List, Dict, Any, Optional
 from dependency_injector.wiring import inject, Provide
 from uuid import uuid4
 from schemas import Message
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 class BaseAgent(IAgent, ABC):
     """Base agent class that defines common functionality"""
@@ -54,11 +57,12 @@ class RAGAgent(BaseAgent):
     def __init__(self, agent_config: Dict[str, Any], 
                  llm_handler: BaseLLM = None, 
                  rag_handler: IRAGHandler = None):
-        super().__init__(agent_config)
+        super().__init__(agent_config or {})
         self.llm_handler = llm_handler
         self.rag_handler = rag_handler
-        self.agent_functions = self._initialize_functions()
-        self.tools = self._initialize_tools()
+        self.agent_functions = None
+        self.tools = None
+        self.tools_config = self.tools_config or {}
         
     def _initialize_functions(self) -> Dict[str, callable]:
         return {
@@ -92,63 +96,86 @@ class RAGAgent(BaseAgent):
         ]
         
     async def response(self, messages: List[dict]):
+        if not self.agent_functions:
+            self.agent_functions = self._initialize_functions()
+        if not self.tools:
+            self.tools = self._initialize_tools()
+            
         messages_dicts = self._prepare_messages(messages)
-        return self.llm_handler.stream_response(
+        response_stream = self.llm_handler.stream_response(
             messages=messages_dicts,
             tools=self.tools,
             function_map=self.agent_functions,
         )
+        
+        # Collect the complete response
+        full_response = ""
+        async for chunk in response_stream:
+            full_response += chunk
+            yield chunk
+            
+        # Store the full response in the instance for later use if needed
+        self.last_full_response = full_response
 
 class AgentFactory:
-    """Factory for creating and managing agent instances"""
+    """Combined factory and manager for agents"""
+    def __init__(self, db: AsyncSession, llm_handler: BaseLLM, rag_handler: IRAGHandler):
+        self.db = db
+        self.llm_handler = llm_handler
+        self.rag_handler = rag_handler
+        self._runtime_agents: Dict[str, BaseAgent] = {}
     
-    def __init__(self):
-        self._agents: Dict[str, BaseAgent] = {}
+    def _get_default_config(self, workspace_id: str) -> Dict[str, Any]:
+        """Get default configuration for a new agent"""
+        return {
+            "workspace_id": workspace_id,
+            "name": "Default Agent",
+            "system_prompt": "You are a helpful AI assistant focused on ASEAN topics.",
+            "tools_config": {
+                "rag_table": "default",
+                "model_name": "gpt-4",
+                "rag_description": "Use this tool to retrieve and generate responses based on the knowledge base"
+            }
+        }
+    
+    async def get_or_create_agent(self, workspace_id: str) -> BaseAgent:
+        """Get existing agent or create new one"""
+        # Check runtime cache
+        if workspace_id in self._runtime_agents:
+            return self._runtime_agents[workspace_id]
         
-    @inject
-    def create_agent(self, 
-                    agent_config: Dict[str, Any], 
-                    agent_type: str = "rag",
-                    llm_handler: Optional[BaseLLM] = None, 
-                    rag_handler: Optional[IRAGHandler] = None) -> BaseAgent:
-        """
-        Create or retrieve an agent instance
+        # Check database
+        result = await self.db.execute(
+            select(Agent).where(Agent.workspace_id == workspace_id)
+        )
+        db_agent = result.scalars().first()
         
-        Args:
-            agent_config: Configuration dictionary for the agent
-            agent_type: Type of agent to create ("rag", "chat", etc.)
-            llm_handler: Language model handler
-            rag_handler: RAG handler for retrieval operations
-            
-        Returns:
-            BaseAgent: An instance of the appropriate agent type
-        """
-        workspace_id = agent_config['workspace_id']
+        if not db_agent:
+            # Create new agent with default config
+            agent_config = self._get_default_config(workspace_id)
+            agent = self._create_agent(agent_config)
+            self._runtime_agents[workspace_id] = agent
+            return agent
         
-        if workspace_id in self._agents:
-            return self._agents[workspace_id]
-            
-        agent: BaseAgent
-        if agent_type == "rag":
-            agent = RAGAgent(
-                agent_config=agent_config,
-                llm_handler=llm_handler,
-                rag_handler=rag_handler
-            )
-        else:
-            raise ValueError(f"Unknown agent type: {agent_type}")
-            
-        self._agents[workspace_id] = agent
+        # Create runtime agent from DB config
+        agent_config = {
+            "id": db_agent.id,
+            "name": db_agent.name,
+            "system_prompt": db_agent.system_prompt,
+            "tools_config": db_agent.tools_config or {},  # Ensure tools_config is not None
+            "workspace_id": db_agent.workspace_id
+        }
+        agent = self._create_agent(agent_config)
+        self._runtime_agents[workspace_id] = agent
         return agent
-        
-    def get_agent(self, workspace_id: str) -> Optional[BaseAgent]:
-        """Retrieve an existing agent instance"""
-        return self._agents.get(workspace_id)
-        
-    def remove_agent(self, workspace_id: str) -> None:
-        """Remove an agent instance"""
-        if workspace_id in self._agents:
-            del self._agents[workspace_id]
+    
+    def _create_agent(self, config: Dict[str, Any]) -> BaseAgent:
+        """Create new agent instance"""
+        return RAGAgent(
+            agent_config=config,
+            llm_handler=self.llm_handler,
+            rag_handler=self.rag_handler
+        )
 
 
 

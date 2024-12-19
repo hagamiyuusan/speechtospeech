@@ -1,13 +1,13 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
 from .base_manager import BaseManager
 from app.models.workspace import Workspace
-from app.models.agent import Agents
+from app.models.agent import Agent
 
 class WorkspaceManager(BaseManager[Workspace]):
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         super().__init__(db, Workspace)
     
     async def create_workspace(self, name: str, admin_id: str, collection_name: str) -> Workspace:
@@ -72,7 +72,7 @@ class WorkspaceManager(BaseManager[Workspace]):
             await self.db.rollback()
             raise HTTPException(status_code=400, detail=str(e))
     
-    async def get_workspace_agent(self, workspace_id: str) -> Optional[Agents]:
+    async def get_workspace_agent(self, workspace_id: str) -> Optional[Agent]:
         """Get the agent associated with a workspace"""
         try:
             workspace = await self.get(workspace_id)
@@ -83,7 +83,7 @@ class WorkspaceManager(BaseManager[Workspace]):
         except SQLAlchemyError as e:
             raise HTTPException(status_code=400, detail=str(e))
     
-    async def update_workspace_agent(self, workspace_id: str, agent_data: dict) -> Agents:
+    async def update_workspace_agent(self, workspace_id: str, agent_data: dict) -> Agent:
         """Update or create the agent for a workspace"""
         try:
             workspace = await self.get(workspace_id)
@@ -96,7 +96,7 @@ class WorkspaceManager(BaseManager[Workspace]):
                     setattr(workspace.agent, key, value)
             else:
                 # Create new agent
-                agent = Agents(workspace_id=workspace_id, **agent_data)
+                agent = Agent(workspace_id=workspace_id, **agent_data)
                 self.db.add(agent)
             
             await self.db.commit()
